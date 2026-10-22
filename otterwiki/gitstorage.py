@@ -7,9 +7,6 @@ import re
 from datetime import datetime
 from typing import List, cast
 
-import git
-import git.exc
-
 from otterwiki.util import split_path, ttl_lru_cache
 from otterwiki.repomgmt import get_repo_manager
 from otterwiki.plugins import plugin_manager
@@ -50,15 +47,36 @@ _REVISION_RE = re.compile(r"\A(?:HEAD|[0-9a-fA-F]{4,64})\Z")
 
 
 class GitStorage(object):
-    def __init__(self, path, initialize=False, allow_external_symlinks=False):
+    def __init__(
+        self,
+        path,
+        initialize=False,
+        allow_external_symlinks=False,
+        git_enabled=True,
+    ):
         # make path absolute
         self.path = str(pathlib.Path(path).absolute())
         # allow symlinks in the working tree that point outside the
         # repository, see _abspath()
         self.allow_external_symlinks = allow_external_symlinks
-        if initialize:
-            self.repo = git.Repo.init(self.path)
-        self.repo = self._read_repo()
+        self.repo = None
+        if git_enabled:
+            # GitPython probes the Git executable on import. Files mode must
+            # work without invoking Git, including that version probe.
+            global git
+            import git
+
+            if initialize:
+                git.Repo.init(self.path)
+            self.repo = self._read_repo()
+
+    @property
+    def supports_git(self):
+        return self.repo is not None
+
+    def _require_git(self):
+        if not self.supports_git:
+            raise StorageNotFound("Git is unavailable in files mode.")
 
     def _read_repo(self):
         try:
@@ -71,6 +89,8 @@ class GitStorage(object):
             )
 
     def _check_reload(self):
+        if not self.supports_git:
+            return
         if os.path.exists(os.path.join(self.path, ".git/RELOAD_GIT")):
             os.remove(os.path.join(self.path, ".git/RELOAD_GIT"))
             self.repo = self._read_repo()
@@ -132,6 +152,7 @@ class GitStorage(object):
         uniform 404, with no oracle that distinguishes a blocked payload
         from an unknown commit.
         """
+        self._require_git()
         if revision is None or not _REVISION_RE.match(str(revision)):
             raise StorageNotFound("Invalid revision: {!r}".format(revision))
 
@@ -141,6 +162,8 @@ class GitStorage(object):
         (git web server, automatic pulls, etc.).
         This method detects what files changed in the last commit.
         """
+        if not self.supports_git:
+            return
         try:
             last_commit = self.repo.head.commit
             changed_files = list(last_commit.stats.files.keys())
@@ -243,6 +266,7 @@ class GitStorage(object):
         return metadata
 
     def _get_commit(self, filename, revision):
+        self._require_git()
         self._check_reload()
         commit = None
         if revision is None:
@@ -358,6 +382,10 @@ class GitStorage(object):
         return metadata
 
     def log(self, filename=None, fail_on_git_error=False, max_count=None):
+        if not self.supports_git:
+            if filename is not None:
+                raise StorageNotFound
+            return []
         if filename is None:
             try:
                 if max_count:
@@ -401,6 +429,8 @@ class GitStorage(object):
         return [self._get_metadata_of_log(entry) for entry in rawlog]
 
     def log_slow(self, filename=None):
+        if not self.supports_git:
+            return self.log(filename)
         if filename is None:
             try:
                 commits = list(self.repo.iter_commits())
@@ -426,6 +456,7 @@ class GitStorage(object):
         # check before creating any directory, a symlinked parent
         # directory would otherwise be followed by makedirs
         abspath = self._abspath(filename)
+        stage = stage and self.supports_git
         if not stage:
             # Without staging, compare against disk rather than the index.
             try:
@@ -463,6 +494,7 @@ class GitStorage(object):
         author=("", ""),
         mode="w",
     ):
+        self._require_git()
         # write the file and stage the change in git
         if not self.update(filename, content, mode):
             return False
@@ -485,6 +517,7 @@ class GitStorage(object):
         return True
 
     def commit(self, filenames, message="", author=("", ""), no_add=False):
+        self._require_git()
         index = self.repo.index
         # add and commit to git
         if no_add == False:
@@ -591,6 +624,7 @@ class GitStorage(object):
         return self.repo.git.diff(rev_a, rev_b)
 
     def delete(self, filename, message=None, author=("", "")):
+        self._require_git()
         if not type(filename) == list:
             filename = [filename]
         # make sure we only try to delete what exists
@@ -634,6 +668,7 @@ class GitStorage(object):
         no_commit=False,
         files_updated=None,
     ):
+        self._require_git()
         if self.exists(new_filename):
             raise StorageError(
                 f'The filename "{new_filename}" already exist. Please choose a new filename.'
@@ -712,6 +747,7 @@ class GitStorage(object):
         """
         Return the output of 'git count-objects -vH'.
         """
+        self._require_git()
         try:
             return self.repo.git.count_objects("-vH")
         except git.exc.GitCommandError as e:
@@ -722,6 +758,7 @@ class GitStorage(object):
         Run 'git gc'. GitPython commits never trigger git's automatic
         housekeeping, so loose objects pile up.
         """
+        self._require_git()
         try:
             return self.repo.git.gc()
         except git.exc.GitCommandError as e:
@@ -744,6 +781,7 @@ class GitStorage(object):
         """
         Get the filename that was used at a specific revision.
         """
+        self._require_git()
         try:
             # get the full log with --follow to understand the rename chain
             full_log = self.repo.git.log(

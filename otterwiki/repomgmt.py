@@ -452,7 +452,7 @@ def initialize_repo_management(storage):
     This should be called from server.py after storage is created.
     """
     global repo_manager
-    repo_manager = RepositoryManager(storage)
+    repo_manager = RepositoryManager(storage) if storage.supports_git else None
 
 
 def get_repo_manager():

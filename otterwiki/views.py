@@ -14,7 +14,7 @@ from flask import (
     jsonify,
     g,
 )
-from otterwiki.server import app, githttpserver
+from otterwiki.server import app, githttpserver, storage
 from otterwiki.wiki import (
     Page,
     Changelog,
@@ -53,6 +53,49 @@ from flask_wtf.csrf import CSRFError
 #
 # technical views/routes/redirects
 #
+@app.before_request
+def require_git_for_repository_features():
+    if storage.supports_git:
+        return
+    if request.endpoint in {
+        "history",
+        "blame",
+        "diff",
+        "changelog",
+        "changelog_feed_rss",
+        "changelog_feed_atom",
+        "show_commit",
+        "revert",
+        "rename",
+        "delete",
+        "attachments",
+        "inline_attachment",
+        "edit_attachment",
+        "dotgit",
+        "git_info_refs",
+        "git_upload_pack",
+        "git_receive_pack",
+        "pull_webhook",
+        "admin_repository_management",
+        "housekeeping",
+        "security_check",
+    }:
+        abort(404)
+    if request.endpoint in {
+        "index",
+        "pageview",
+        "view",
+        "edit",
+        "source",
+        "get_attachment",
+        "get_attachment_thumbnail",
+    } and (
+        (request.view_args or {}).get("revision") is not None
+        or request.values.get("revision") is not None
+    ):
+        abort(404)
+
+
 @app.route("/")
 def index():
     home_page = app.config.get("HOME_PAGE", "")

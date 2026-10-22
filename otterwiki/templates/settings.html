@@ -9,12 +9,14 @@
     </span>
     Settings
 </a>
+{% if storage.supports_git %}
 <a href="{{ url_for("housekeeping") }}" class="sidebar-link sidebar-link-with-icon">
     <span class="sidebar-icon">
         <i class="fas fa-broom"></i>
     </span>
     Housekeeping
 </a>
+{% endif %}
 {% if has_permission("ADMIN") %}
 <a href="{{ url_for("admin") }}" class="sidebar-link sidebar-link-with-icon">
     <span class="sidebar-icon" style="min-width: 3rem;">
@@ -34,12 +36,14 @@
     </span>
     Content and Editing
 </a>
+{% if storage.supports_git %}
 <a href="{{ url_for("admin_repository_management") }}" class="sidebar-link sidebar-link-with-icon">
     <span class="sidebar-icon" style="min-width: 3rem;">
         <i class="fas fa-code-branch"></i>
     </span>
     Repository Management
 </a>
+{% endif %}
 <a href="{{ url_for("admin_user_management") }}" class="sidebar-link sidebar-link-with-icon">
     <span class="sidebar-icon" style="min-width: 3rem;">
         <i class="fas fa-users"></i>
@@ -117,7 +121,7 @@
 {% endif %}
 {#
 #}
-{% if config.GIT_WEB_SERVER %}
+{% if storage.supports_git and config.GIT_WEB_SERVER %}
 <div class="card">
 <div class="mw-full w-600">
 <h2 class="card-title">Git Repository Access</h2>

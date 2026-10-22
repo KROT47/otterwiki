@@ -7,6 +7,7 @@
     <form action="{{ url_for("admin_content_and_editing") }}" method="POST">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <h2 class="card-title">Content and Editing Preferences</h2>
+{% if storage.supports_git %}
     <div class="form-group">
         <label for="commit_message" class="required">Commit message</label>
         <select class="form-control w-md-600" id="commit_message" name="commit_message">
@@ -21,6 +22,10 @@
     <input name="default_commit_message" type="text" class="form-control" id="default_commit_message" value="{{ config.DEFAULT_COMMIT_MESSAGE}}" placeholder="%P updated on %c">
     <div class="form-text">When commit messages are disabled or optional, this provides the default value in these scenarios. <code>strftime</code> <a href="https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes">format codes</a> are parsed and formated, additionally <code>%P</code> is replaced with the name of the page.</div>
   </div>
+{% else %}
+<input type="hidden" name="commit_message" value="{{ config.COMMIT_MESSAGE }}">
+<input type="hidden" name="default_commit_message" value="{{ config.DEFAULT_COMMIT_MESSAGE }}">
+{% endif %}
 {##}
     <div class="form-group">
       <div class="custom-checkbox">

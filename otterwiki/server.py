@@ -24,6 +24,7 @@ app.config.update(
     TESTING=False,
     LOG_LEVEL="INFO",
     REPOSITORY=None,
+    STORAGE_BACKEND="git",  # git or files; selected at startup
     SECRET_KEY="CHANGE ME",
     SITE_NAME="An Otter Wiki",
     SITE_DESCRIPTION=None,
@@ -153,9 +154,11 @@ if (
 csrf = CSRFProtect(app)
 
 # setup storage
+if app.config["STORAGE_BACKEND"] not in ("git", "files"):
+    fatal_error("STORAGE_BACKEND must be 'git' or 'files'.")
 if app.config["REPOSITORY"] is None:
     fatal_error("Please configure a REPOSITORY path.")
-elif not os.path.exists(app.config["REPOSITORY"]):
+elif not os.path.isdir(app.config["REPOSITORY"]):
     fatal_error(
         "Repository path '{}' not found. Please configure otterwiki.".format(
             app.config["REPOSITORY"]
@@ -166,6 +169,7 @@ else:
         storage = otterwiki.gitstorage.GitStorage(
             app.config["REPOSITORY"],
             allow_external_symlinks=app.config["GIT_ALLOW_EXTERNAL_SYMLINKS"],
+            git_enabled=app.config["STORAGE_BACKEND"] == "git",
         )
     except otterwiki.gitstorage.StorageError as e:
         fatal_error(e)
@@ -177,7 +181,7 @@ if otterwiki.util.empty(app.config["SERVER_NAME"]):
 
 # check if the git repository is empty
 if (len(storage.list()[0]) < 1) and (  # pyright: ignore never unbound
-    len(storage.log()) < 1  # pyright: ignore
+    not storage.supports_git or len(storage.log()) < 1  # pyright: ignore
 ):
     home_page_config = app.config.get("HOME_PAGE", "")
 
@@ -201,12 +205,17 @@ if (len(storage.list()[0]) < 1) and (  # pyright: ignore never unbound
                 else:
                     filename = f"{custom_path.lower()}.md"
 
-            storage.store(  # pyright: ignore
-                filename=filename,
-                content=content,
-                author=("Otterwiki Robot", "noreply@otterwiki"),
-                message="Initial commit",
-            )
+            if storage.supports_git:  # pyright: ignore
+                storage.store(  # pyright: ignore
+                    filename=filename,
+                    content=content,
+                    author=("Otterwiki Robot", "noreply@otterwiki"),
+                    message="Initial commit",
+                )
+            else:
+                storage.update(
+                    filename, content, stage=False
+                )  # pyright: ignore
             app.logger.info(f"server: Created initial page /{filename[:-3]}.")
 
 
@@ -243,6 +252,8 @@ def update_app_config():
     global mail
     with app.app_context():
         for item in Preferences.query:
+            if item.name == "STORAGE_BACKEND":
+                continue  # Changing the backend requires a restart.
             if item.name.upper() in [
                 "MAIL_USE_TLS",
                 "MAIL_USE_SSL",
@@ -283,7 +294,16 @@ def update_app_config():
                 )
             # update app settings
             app.config[item.name] = item.value
-        load_private_key_files()
+        if storage.supports_git:
+            load_private_key_files()
+        else:
+            for key in (
+                "PAGE_SAVE_AUTOCOMMIT",
+                "GIT_WEB_SERVER",
+                "GIT_REMOTE_PUSH_ENABLED",
+                "GIT_REMOTE_PULL_ENABLED",
+            ):
+                app.config[key] = False
         # setup flask_mail
         mail = Mail(app)
 
@@ -427,6 +447,7 @@ def plugin_sidebar_right_inject(page=None):
 
 
 app.jinja_env.globals.update(
+    storage=storage,
     load_custom_html=load_custom_html,
     plugin_html_head_inject=plugin_html_head_inject,
     plugin_html_body_inject=plugin_html_body_inject,
@@ -437,7 +458,11 @@ app.jinja_env.globals.update(
 # initialize git via http
 import otterwiki.remote
 
-githttpserver = otterwiki.remote.GitHttpServer(path=app.config["REPOSITORY"])
+githttpserver = (
+    otterwiki.remote.GitHttpServer(path=app.config["REPOSITORY"])
+    if storage.supports_git
+    else None
+)
 
 # initialize repository management stuff
 import otterwiki.repomgmt

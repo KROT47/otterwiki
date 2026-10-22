@@ -141,10 +141,15 @@ def health_check():
     # storage check
     if not os.access(storage.path, os.W_OK):
         msg += [f"{storage.path} is not writeable."]
-    try:
-        storage.log(fail_on_git_error=True, max_count=1)
-    except StorageError as e:
-        msg += [f"StorageError in {storage.path}: {e}"]
+    if storage.supports_git:
+        try:
+            storage.log(fail_on_git_error=True, max_count=1)
+        except StorageError as e:
+            msg += [f"StorageError in {storage.path}: {e}"]
+    elif not os.path.isdir(storage.path) or not os.access(
+        storage.path, os.R_OK | os.X_OK
+    ):
+        msg += [f"{storage.path} is not a readable directory."]
     # db check
     try:
         Preferences.query.all()

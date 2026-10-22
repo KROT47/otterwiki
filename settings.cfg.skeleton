@@ -6,6 +6,9 @@ SECRET_KEY        = 'CHANGE ME'
 SITE_NAME         = 'Otterwiki'
 # Configure the path to the repository:
 REPOSITORY        = '/path/to/the/repository/root'
+# Optional plain-folder mode; default is 'git'. Restart after changing.
+# In Docker, set STORAGE_BACKEND=files in the container environment instead.
+# STORAGE_BACKEND   = 'files'
 
 # The Logo can be the url of any image, even an attachment. e.g.:
 # SITE_LOGO       = '//Home/a/logo.png'

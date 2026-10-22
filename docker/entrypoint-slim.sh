@@ -3,27 +3,41 @@
 
 set -e
 
-# take care of repository dictionary
-if [ ! -d ${OTTERWIKI_REPOSITORY} ]; then
-    mkdir -p ${OTTERWIKI_REPOSITORY}
+# Docker selects the backend through the environment before Python starts.
+STORAGE_BACKEND=${STORAGE_BACKEND-git}
+case "$STORAGE_BACKEND" in
+    git|files) ;;
+    *) echo "Fatal: STORAGE_BACKEND must be git or files." >&2; exit 1 ;;
+esac
+export STORAGE_BACKEND
+
+# take care of repository directory
+if [ ! -d "$OTTERWIKI_REPOSITORY" ]; then
+    mkdir -p "$OTTERWIKI_REPOSITORY"
 fi
 
-if [ ! -d ${OTTERWIKI_REPOSITORY}/.git ]; then
-    git init -b main ${OTTERWIKI_REPOSITORY}
-fi
+if [ "$STORAGE_BACKEND" = "git" ]; then
+    if [ ! -d "$OTTERWIKI_REPOSITORY/.git" ]; then
+        git init -b main "$OTTERWIKI_REPOSITORY"
+    fi
 
-# configure git
-cd ${OTTERWIKI_REPOSITORY}
-git config user.name "Otterwiki Robot"
-git config user.email "noreply@otterwiki"
+    # configure git
+    cd "$OTTERWIKI_REPOSITORY"
+    git config user.name "Otterwiki Robot"
+    git config user.email "noreply@otterwiki"
+fi
 
 # take care of the otterwiki settings file
-if [ ! -f ${OTTERWIKI_SETTINGS} ]; then
-    RANDOM_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
-    echo "DEBUG = False" >> ${OTTERWIKI_SETTINGS}
-    echo "REPOSITORY = '/app-data/repository'" >> ${OTTERWIKI_SETTINGS}
-    echo "SECRET_KEY = '${RANDOM_SECRET_KEY}'" >> ${OTTERWIKI_SETTINGS}
-    echo "SQLALCHEMY_DATABASE_URI = 'sqlite:////app-data/db.sqlite'" >> ${OTTERWIKI_SETTINGS}
+if [ ! -f "$OTTERWIKI_SETTINGS" ]; then
+    python3 - "$OTTERWIKI_REPOSITORY" >> "$OTTERWIKI_SETTINGS" <<'PY'
+import secrets
+import sys
+
+print("DEBUG = False")
+print(f"REPOSITORY = {sys.argv[1]!r}")
+print(f"SECRET_KEY = {secrets.token_hex(32)!r}")
+print("SQLALCHEMY_DATABASE_URI = 'sqlite:////app-data/db.sqlite'")
+PY
 fi
 
 # install plugins found in /app-data/plugins and /plugins

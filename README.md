@@ -58,7 +58,55 @@ services:
       - ./app-data:/app-data
 ```
 
-### Save Markdown without automatic commits (fork option)
+### Plain Markdown folder (fork option)
+
+`STORAGE_BACKEND` accepts `git` (the default) or `files`. With `files`,
+`REPOSITORY` is an ordinary Markdown folder: the app reads and saves current
+files without opening or creating a Git repository, even inside a parent Git
+working tree. Existing `.git` metadata is ignored. Create, edit, preview and
+SQLite draft autosave remain available; Save writes directly to disk regardless
+of `PAGE_SAVE_AUTOCOMMIT` and skips the commit-message modal. Content-change
+plugin hooks still run.
+
+For a Python installation, set `STORAGE_BACKEND = 'files'` and `REPOSITORY` in
+`settings.cfg`, or use their environment variables. Backend selection is a
+startup setting: restart the app to change it. Repository Management preferences
+cannot enable Git features in files mode.
+
+For Docker, use an image built from this fork and select the backend through the
+**container environment**. Both entrypoints validate and export
+`STORAGE_BACKEND` before Python starts; if absent it defaults to `git`, overriding
+a backend set only in `settings.cfg`. For example, add to the service:
+
+```yaml
+environment:
+  STORAGE_BACKEND: files
+  OTTERWIKI_REPOSITORY: /wiki
+  REPOSITORY: /wiki
+volumes:
+  - ./wiki:/wiki
+  - ./app-data:/app-data
+```
+
+`OTTERWIKI_REPOSITORY` selects the entrypoint's content directory; `REPOSITORY`
+also selects it for Python when a settings file already exists. A newly generated
+settings file uses `OTTERWIKI_REPOSITORY`. In files mode the entrypoints skip
+Git initialization and configuration. The existing `/app-data` location for
+SQLite and settings is unchanged.
+The container user must have read and write access to the content folder.
+
+Files mode v1 disables rename, delete, upload, revert, history, blame, Git
+administration, Git HTTP, remote synchronization and Git housekeeping. Git
+metadata and historical revisions are unavailable. The Housekeeping screen,
+including its draft list and security check, is unavailable; drafts can still be
+resumed or discarded from the editor. It does not migrate or
+rename existing content: normal page-name normalization still applies, including
+lowercase filenames by default. Consider `RETAIN_PAGE_NAME_CASE = True` for an
+existing folder with mixed-case filenames; other filename normalization rules
+still apply. An old browser tab can still overwrite newer content. Plugins that
+perform their own Git operations need separate compatibility checks.
+
+### Save Markdown without automatic commits in Git mode (fork option)
 
 `PAGE_SAVE_AUTOCOMMIT` defaults to `True`, preserving the normal Save behavior.
 Set `PAGE_SAVE_AUTOCOMMIT = False` in `settings.cfg`, or set the environment

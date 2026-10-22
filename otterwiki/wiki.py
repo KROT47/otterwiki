@@ -419,6 +419,8 @@ class Page:
         return get_breadcrumbs(self.pagepath)
 
     def load(self, revision: str | None):
+        if not storage.supports_git:
+            return storage.load(self.filename, revision=revision), None
         metadata = None
         content = None
 
@@ -594,7 +596,7 @@ class Page:
             )
 
         danger_alert = False
-        if not self.metadata:
+        if storage.supports_git and not self.metadata:
             danger_alert = [
                 "Not under version control",
                 f"""This page was loaded from the repository but is not added under git version control. Make a commit on the <a href="{url_for('edit', path=self.pagepath)}" class="alert-link">Edit page</a> to add it.""",
@@ -782,7 +784,9 @@ class Page:
         revision = self.metadata.get("revision", "") if self.metadata else ""
         if draft is not None:
             # the revision the draft is based on, empty for a new page
-            draft_revision = draft.revision or ""
+            draft_revision = (
+                (draft.revision or "") if storage.supports_git else ""
+            )
             if handle_draft is None:
                 return self._draft_overview(
                     draft, draft_revision, self._changes_since(draft_revision)
@@ -808,11 +812,17 @@ class Page:
 
         # get file listing
         t_start = timer()
-        files = [
-            f.data
-            for f in self._attachments(maximum=100, exclude_extensions=".md")
-            if f.metadata is not None
-        ]
+        files = (
+            [
+                f.data
+                for f in self._attachments(
+                    maximum=100, exclude_extensions=".md"
+                )
+                if f.metadata is not None
+            ]
+            if storage.supports_git
+            else []
+        )
         app.logger.debug(
             "Page.editor() collecting {} attachments (files) took {:.3f} seconds.".format(
                 len(files), timer() - t_start
@@ -848,6 +858,8 @@ class Page:
         Returns the commits of the page newer than revision, newest first.
         Returns None if revision can not be found in the history of the page.
         """
+        if not storage.supports_git:
+            return []
         try:
             log = storage.log(self.filename)
         except StorageNotFound:
@@ -864,7 +876,13 @@ class Page:
         # diff the draft against the version it is based on, so the diff shows
         # only the changes made in the draft
         base_content = None
-        if not draft_revision:
+        if not storage.supports_git:
+            draft_revision = ""
+            changes = []
+            base_content = (
+                self.content if self.exists else self._new_page_content()
+            )
+        elif not draft_revision:
             base_content = self._new_page_content()
         elif changes is not None:
             try:
@@ -872,7 +890,9 @@ class Page:
             except StorageError:
                 pass
         # fall back to the stored version, if the base can not be loaded
-        diff_against_stored = base_content is None
+        diff_against_stored = base_content is None or (
+            not storage.supports_git and self.exists
+        )
         if diff_against_stored:
             base_content = (
                 self.content if self.exists else self._new_page_content()
@@ -922,7 +942,7 @@ class Page:
 
         # store page
         try:
-            if app.config["PAGE_SAVE_AUTOCOMMIT"]:
+            if storage.supports_git and app.config["PAGE_SAVE_AUTOCOMMIT"]:
                 changed = storage.store(
                     filename=self.filename,
                     content=content,
@@ -1623,7 +1643,7 @@ class Page:
         # update content, timestamp, revision, line
         draft.content = content
         draft.datetime = datetime.now(UTC)
-        draft.revision = revision
+        draft.revision = revision if storage.supports_git else ""
         draft.cursor_line = cursor_line
         draft.cursor_ch = cursor_ch
 
@@ -1916,7 +1936,7 @@ class Attachment:
             not self.exists()
             or not self.mimetype
             or not self.mimetype.startswith("image")
-            or self.metadata is None
+            or (storage.supports_git and self.metadata is None)
         ):
             abort(404)
 
@@ -1974,7 +1994,11 @@ class Attachment:
             (now_utc + timedelta(hours=1)).astimezone(UTC)
         )
         response.headers["Last-Modified"] = http_date(
-            self.datetime.astimezone(UTC)
+            (
+                self.datetime
+                if storage.supports_git
+                else storage.mtime(self.filepath)
+            ).astimezone(UTC)
         )
         return self._harden_response(response)
 

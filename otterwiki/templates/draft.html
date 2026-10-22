@@ -77,7 +77,9 @@
 {% endif %}
 </div>
 
-{% if diff_against_stored %}
+{% if not storage.supports_git and page_exists %}
+<p class="text-muted">Compared with the current file; no historical baseline is available. Saving the draft overwrites the current file.</p>
+{% elif diff_against_stored %}
 <p class="text-muted">Compared to the stored version, since the version the draft is based on is not available.</p>
 {% endif %}
 {% if draft_diff %}

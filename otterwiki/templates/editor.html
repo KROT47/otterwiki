@@ -361,7 +361,7 @@
     </div>
   </div>
 </div>
-{%if config["PAGE_SAVE_AUTOCOMMIT"] and config["COMMIT_MESSAGE"] != "DISABLED"%}
+{%if storage.supports_git and config["PAGE_SAVE_AUTOCOMMIT"] and config["COMMIT_MESSAGE"] != "DISABLED"%}
 <div class="modal" id="modal-commit" tabindex="-1" role="dialog">
   <div class="modal-dialog" role="document">
     <div class="modal-content">
@@ -401,6 +401,7 @@
 #}
 {% block extra_nav -%}
 <div id="extranav-attachments">
+{% if storage.supports_git %}
 <h5 class="sidebar-title"><a class="sidebar-title-link" href="{{ url_for('attachments', pagepath=pagepath ) }}">Attachments <i class="fa fa-paperclip"></i></a></h5>
                     <div class="sidebar-divider" ></div>
                     <form class="ml-10">
@@ -435,6 +436,7 @@
 
 
                     <p class="font-size-12 p-15 text-muted">Additional media can be added via the 'Attachments' of this page, or, you can drag and drop a file into the web editor and it will be uploaded and embedded when the page is saved.</p>
+{% endif %}
 
                     <h5 class="sidebar-title">WikiLink <i class="fa fa-link"></i></h5>
                     <div class="sidebar-divider" ></div>
@@ -485,7 +487,7 @@
 #}
 {% block navbar %}
 <a href="{{ url_for('view', path=pagepath) }}" class="btn btn-danger mr-5" role="button" title="Cancel"><i class="fas fa-window-close"></i></a>
-{%if not config["PAGE_SAVE_AUTOCOMMIT"] or config["COMMIT_MESSAGE"] == "DISABLED"%}
+{%if not storage.supports_git or not config["PAGE_SAVE_AUTOCOMMIT"] or config["COMMIT_MESSAGE"] == "DISABLED"%}
 <form id="saveform" action="{{ url_for('save', path=pagepath) }}" method="post" autocomplete="off">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <input id="save_content" type="hidden" name="content" value="">
@@ -516,6 +518,7 @@
         cursorLine: {{cursor_line or 0}},
         cursorCh: {{cursor_ch or 0}},
         isMobile: /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent),
+{% if storage.supports_git %}
         inlineAttachmentOptions: {
             uploadUrl: {{ url_for('inline_attachment', pagepath=pagepath) | tojson }},
             extraHeaders: {'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content},
@@ -552,6 +555,7 @@
                 return false;
             }
         }
+{% endif %}
     };
     function refreshAttachmentsDropdown(attachments, selectFilename) {
         var attachmentSelect = document.getElementById('attachment-filename');
