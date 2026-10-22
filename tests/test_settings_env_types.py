@@ -112,6 +112,7 @@ def test_initialization_type_by_env(create_app_with_env_setting):
         ["GIT_REMOTE_PUSH_ENABLED", "nO", False],
         ["GIT_REMOTE_PULL_ENABLED", "ofF", False],
         ["GIT_REMOTE_PULL_URL_SECURE", "0", False],
+        ["PAGE_SAVE_AUTOCOMMIT", "ofF", False],
         ["HIDE_LOGO", "Anything Else", False],
         # string
         ["DEFAULT_COMMIT_MESSAGE", "hello", "hello"],

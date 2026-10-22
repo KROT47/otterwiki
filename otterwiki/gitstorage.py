@@ -421,10 +421,19 @@ class GitStorage(object):
         filename,
         content,
         mode="w",
+        stage=True,
     ):
         # check before creating any directory, a symlinked parent
         # directory would otherwise be followed by makedirs
         abspath = self._abspath(filename)
+        if not stage:
+            # Without staging, compare against disk rather than the index.
+            try:
+                with open(abspath, "rb" if "b" in mode else "r") as f:
+                    if f.read() == content:
+                        return False
+            except (FileNotFoundError, UnicodeDecodeError):
+                pass
         dirname = os.path.dirname(filename)
         if dirname != "":
             os.makedirs(
@@ -433,6 +442,8 @@ class GitStorage(object):
         # store file on filesystem
         with open(abspath, mode) as f:
             f.write(content)
+        if not stage:
+            return True
         # check if file has changed
         diff = self.repo.index.diff(None, paths=filename)
         if len(diff) == 0 and filename not in self.repo.untracked_files:

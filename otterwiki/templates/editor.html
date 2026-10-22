@@ -361,7 +361,7 @@
     </div>
   </div>
 </div>
-{%if config["COMMIT_MESSAGE"] != "DISABLED"%}
+{%if config["PAGE_SAVE_AUTOCOMMIT"] and config["COMMIT_MESSAGE"] != "DISABLED"%}
 <div class="modal" id="modal-commit" tabindex="-1" role="dialog">
   <div class="modal-dialog" role="document">
     <div class="modal-content">
@@ -485,7 +485,7 @@
 #}
 {% block navbar %}
 <a href="{{ url_for('view', path=pagepath) }}" class="btn btn-danger mr-5" role="button" title="Cancel"><i class="fas fa-window-close"></i></a>
-{%if config["COMMIT_MESSAGE"] == "DISABLED"%}
+{%if not config["PAGE_SAVE_AUTOCOMMIT"] or config["COMMIT_MESSAGE"] == "DISABLED"%}
 <form id="saveform" action="{{ url_for('save', path=pagepath) }}" method="post" autocomplete="off">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <input id="save_content" type="hidden" name="content" value="">

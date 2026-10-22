@@ -58,6 +58,28 @@ services:
       - ./app-data:/app-data
 ```
 
+### Save Markdown without automatic commits (fork option)
+
+`PAGE_SAVE_AUTOCOMMIT` defaults to `True`, preserving the normal Save behavior.
+Set `PAGE_SAVE_AUTOCOMMIT = False` in `settings.cfg`, or set the environment
+variable `PAGE_SAVE_AUTOCOMMIT=false`, to make editor Save write new and existing
+Markdown pages directly to disk without staging, committing, or auto-pushing.
+The commit-message modal is skipped; `COMMIT_MESSAGE=DISABLED` by itself only
+hides the message input and still commits when autocommit is enabled.
+
+This option preserves the Git index (including partial and unrelated staging),
+HEAD and refs. Unchanged content is compared with the file on disk. Content-change
+plugin hooks still run, and draft autosave still uses SQLite. After re-enabling
+autocommit, saving content that differs from the index stages and commits it
+using the normal Git behavior, which can also commit other staged changes.
+
+This is not a fully Git-free mode: rename, delete, upload, revert and startup
+retain their existing Git behavior. New nonempty untracked pages remain readable
+with the existing warning, but history and Git metadata may be stale until a
+separate commit. The existing risk that an old browser tab overwrites newer
+content also remains; this option does not add conflict detection. Content-change
+plugins keep their own behavior and should be considered when enabling the option.
+
 ## License
 
 An Otter Wiki is open-source software licensed under the [MIT License](https://github.com/redimp/otterwiki/blob/main/LICENSE).

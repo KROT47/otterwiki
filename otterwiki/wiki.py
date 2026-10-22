@@ -922,12 +922,21 @@ class Page:
 
         # store page
         try:
-            changed = storage.store(
-                filename=self.filename,
-                content=content,
-                message=commit,
-                author=author,
-            )
+            if app.config["PAGE_SAVE_AUTOCOMMIT"]:
+                changed = storage.store(
+                    filename=self.filename,
+                    content=content,
+                    message=commit,
+                    author=author,
+                )
+            else:
+                changed = storage.update(
+                    filename=self.filename, content=content, stage=False
+                )
+                if changed:
+                    plugin_manager.hook.repository_changed(
+                        changed_files=[self.filename]
+                    )
         except StorageUnsafePath as e:
             abort(403, description=str(e))
         if not changed:

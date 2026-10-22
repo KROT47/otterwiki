@@ -21,6 +21,10 @@ EMAIL_NEEDS_CONFIRMATION = True
 # NOTIFY_ADMINS_ON_REGISTER = True
 # RETAIN_PAGE_NAME_CASE = False
 
+# Save Markdown pages to disk without staging, committing or auto-pushing.
+# Other Git operations are unaffected. See README.md for limitations.
+# PAGE_SAVE_AUTOCOMMIT = False
+
 # Database Configuration
 # e.g. SQLALCHEMY_DATABASE_URI='sqlite:////absolute/path/to/the/sqlite/database/file'
 # see https://flask-sqlalchemy.palletsprojects.com/en/2.x/config/#connection-uri-format
@@ -47,4 +51,3 @@ SQLALCHEMY_DATABASE_URI = ''
 # MAIL_PORT = 1025
 # MAIL_USERNAME = None
 # MAIL_PASSWORD = None
-
